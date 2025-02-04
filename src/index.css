@@ -1,0 +1,39 @@
+/* General Reset */
+body {
+  margin: 0;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  background-color: #f4f6f9; /* Light gray background */
+  color: #333; /* Dark text for better readability */
+  display: block; /* Removed flex to prevent unnatural centering */
+  min-height: 100vh;
+}
+
+/* Remove margin and padding between sidebar and content */
+.content-wrapper {
+  margin-left: 0; /* Remove default margin */
+  padding-left: 0; /* Remove default padding */
+}
+
+.sidebar-mini .main-sidebar {
+  margin-right: 0; /* Remove extra spacing next to sidebar */
+}
+
+/* Ensure container alignment for consistent layout */
+.container-fluid {
+  padding: 7px; /* Remove container padding for snug fit */
+}
+
+
+/* Remove underline (border-bottom) for the H1 element */
+h1.m-0 {
+  text-decoration: none !important; /* Ensure text-decoration is removed */
+  border-bottom: none !important; /* Remove any borders under the element */
+}
+
+/* Ensure no borders or decorations on parent container */
+.content-header {
+  border-bottom: none !important; /* Remove any border on parent container */
+  padding-bottom: 0; /* Ensure no padding contributes to the underline */
+}
