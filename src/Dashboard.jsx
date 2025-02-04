@@ -27,6 +27,8 @@ const DoctorDashboard = () => {
   const [currentPatient, setCurrentPatient] = useState(null); // Store the current patient being called
   const [loadingNext, setLoadingNext] = useState(false);
   const [loadingRepeat, setLoadingRepeat] = useState(false);
+  const [disableCallNext, setDisableCallNext] = useState(false); // Disable Call Next button
+
 
   useEffect(() => {
     fetchPatients();
@@ -96,6 +98,7 @@ const DoctorDashboard = () => {
       if (response.data.success && response.data.data.length > 0) {
         const nextPatient = response.data.data[0];
         setCurrentPatient(nextPatient);
+        setDisableCallNext(false);
 
         // Announce queue number
         announceQueueNumber(nextPatient.queue_number);
@@ -116,8 +119,8 @@ const DoctorDashboard = () => {
 
   const repeatCall = () => {
     if (!currentPatient) {
-        alert("No current patient to repeat the call for.");
-        return;
+      alert("No current patient to repeat the call for.");
+      return;
     }
     setLoadingRepeat(true);
 
@@ -125,10 +128,10 @@ const DoctorDashboard = () => {
     announceQueueNumber(currentPatient.queue_number);
 
     setTimeout(() => {
-        alert(`Repeated call for patient: (Queue No: ${currentPatient.queue_number})`);
-        setLoadingRepeat(false);
+      alert(`Repeated call for patient: (Queue No: ${currentPatient.queue_number})`);
+      setLoadingRepeat(false);
     }, 1000); // Simulate a delay for the repeat call
-};
+  };
 
   const calculateAge = (dob) => {
     const birthDate = new Date(dob);
@@ -150,21 +153,11 @@ const DoctorDashboard = () => {
     }
   };
 
-  const fetchTableData = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/patientlist`, {
-        headers: { 'Cache-Control': 'no-cache' }, // Disable cache to ensure fresh data
-      });
-      setTableData(response.data);
-    } catch (error) {
-      console.error("Error fetching table data:", error);
-    }
-  };
-
   const handleTimeIn = async (patient) => {
     try {
       await axios.put(`${API_BASE_URL}/patients/${patient.id}/timein`);
       await refreshData(); // Unified function to refresh both patients and stats
+      setDisableCallNext(true);
       alert("Time In recorded successfully!");
     } catch (error) {
       console.error("Error updating Time In:", error);
@@ -180,6 +173,7 @@ const DoctorDashboard = () => {
     try {
       await axios.put(`${API_BASE_URL}/patients/${patient.id}/timeout`);
       await refreshData(); // Unified function to refresh both patients and stats
+      setDisableCallNext(false);
       alert("Time Out recorded successfully!");
     } catch (error) {
       console.error("Error updating Time Out:", error);
@@ -356,12 +350,13 @@ const DoctorDashboard = () => {
                   </h3>
                   <div>
                     <button
-                      className="btn btn-primary btn-sm mr-2"
+                      className="btn btn-primary btn-sm"
                       onClick={callNextPatient}
-                      disabled={loadingNext}
+                      disabled={loadingNext || disableCallNext} // ✅ Correct condition
                     >
                       {loadingNext ? "Calling..." : "Call Next Patient"}
                     </button>
+
                     <button
                       className="btn btn-danger btn-sm"
                       onClick={repeatCall}
