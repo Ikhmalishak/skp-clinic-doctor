@@ -24,6 +24,9 @@ const DoctorDashboard = () => {
   const [medicineSuggestions, setMedicineSuggestions] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [currentPatient, setCurrentPatient] = useState(null); // Store the current patient being called
+  const [loadingNext, setLoadingNext] = useState(false);
+  const [loadingRepeat, setLoadingRepeat] = useState(false);
 
   useEffect(() => {
     fetchPatients();
@@ -43,6 +46,8 @@ const DoctorDashboard = () => {
         gender: item.employee ? item.employee.gender : "N/A",
         age: item.employee && item.employee.dob ? calculateAge(item.employee.dob) : "N/A",
         status: item.status,
+        timeIn: item.patient_in_time,
+        timeOut: item.patient_out_time
       }));
 
       console.log("Formatted Data:", formattedData);
@@ -50,6 +55,77 @@ const DoctorDashboard = () => {
     } catch (error) {
       console.error("Error fetching patients:", error);
     }
+  };
+  const announceQueueNumber = (queueNumber) => {
+    if ("speechSynthesis" in window) {
+      // Format the queue number as "zero zero seven"
+      const formattedQueueNumber = queueNumber
+        .toString()
+        .split("")
+        .map((digit) => (digit === "0" ? "zero" : digit))
+        .join(" ");
+
+      // Play "ding dong" sound
+      const audio = new Audio('/sounds/minimalist-ding-dong.wav');
+      audio.play();
+
+      // Wait for the sound to finish before speaking
+      audio.onended = () => {
+        // English announcement
+        const englishUtterance = new SpeechSynthesisUtterance(`Now serving ${formattedQueueNumber}`);
+        englishUtterance.lang = "en-US";
+        englishUtterance.rate = 0.8; // Adjusted rate for better clarity
+
+        // Malay announcement
+        const malayUtterance = new SpeechSynthesisUtterance(`Sekarang nombor ${formattedQueueNumber}`);
+        malayUtterance.lang = "ms-MY";
+        malayUtterance.rate = 0.8; // Adjusted rate for better clarity
+
+        // Queue announcements
+        window.speechSynthesis.speak(englishUtterance);
+        window.speechSynthesis.speak(malayUtterance);
+      };
+    }
+  };
+
+  const callNextPatient = async () => {
+    setLoadingNext(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/patients/next`);
+
+      if (response.data.success && response.data.data.length > 0) {
+        const nextPatient = response.data.data[0];
+        setCurrentPatient(nextPatient);
+
+        // Announce queue number
+        announceQueueNumber(nextPatient.queue_number);
+
+        alert(`Next patient called: (Queue No: ${nextPatient.queue_number})`);
+
+        await fetchPatients(); // Refresh the patient list
+      } else {
+        alert("No patients waiting in the queue.");
+      }
+    } catch (error) {
+      console.error("Error calling next patient:", error);
+      alert("Failed to call the next patient. Please try again.");
+    } finally {
+      setLoadingNext(false);
+    }
+  };
+
+  const repeatCall = () => {
+    if (!currentPatient) {
+      alert("No current patient to repeat the call for.");
+      return;
+    }
+    setLoadingRepeat(true);
+    // Announce queue number
+    announceQueueNumber(nextPatient.queue_number);
+    setTimeout(() => {
+      alert(`Repeated call for patient: (Queue No: ${currentPatient.queue_number})`);
+      setLoadingRepeat(false);
+    }, 1000); // Simulate a delay for the repeat call
   };
 
   const calculateAge = (dob) => {
@@ -72,34 +148,52 @@ const DoctorDashboard = () => {
     }
   };
 
+  const fetchTableData = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/patientlist`, {
+        headers: { 'Cache-Control': 'no-cache' }, // Disable cache to ensure fresh data
+      });
+      setTableData(response.data);
+    } catch (error) {
+      console.error("Error fetching table data:", error);
+    }
+  };
+
   const handleTimeIn = async (patient) => {
     try {
       await axios.put(`${API_BASE_URL}/patients/${patient.id}/timein`);
-      setTableData((prevData) =>
-        prevData.map((item) =>
-          item.id === patient.id ? { ...item, patientInTime: new Date().toLocaleString() } : item
-        )
-      );
+      await refreshData(); // Unified function to refresh both patients and stats
       alert("Time In recorded successfully!");
     } catch (error) {
       console.error("Error updating Time In:", error);
-      alert("Failed to update Time In. Please try again.");
+      const errorMessage =
+        error.response && error.response.data && error.response.data.error
+          ? error.response.data.error
+          : "Failed to update Time In. Please try again.";
+      alert(errorMessage);
     }
   };
 
   const handleTimeOut = async (patient) => {
     try {
       await axios.put(`${API_BASE_URL}/patients/${patient.id}/timeout`);
-      setTableData((prevData) =>
-        prevData.map((item) =>
-          item.id === patient.id ? { ...item, patientInOut: new Date().toLocaleString() } : item
-        )
-      );
+      await refreshData(); // Unified function to refresh both patients and stats
       alert("Time Out recorded successfully!");
     } catch (error) {
-      console.error("Error updating Time In:", error);
-      alert("Failed to update Time In. Please try again.");
+      console.error("Error updating Time Out:", error);
+      const errorMessage =
+        error.response && error.response.data && error.response.data.error
+          ? error.response.data.error
+          : "Failed to update Time Out. Please try again.";
+      alert(errorMessage);
     }
+  };
+
+
+  // Refresh both patients and stats
+  const refreshData = async () => {
+    await fetchPatients();
+    await fetchStats();
   };
 
   const updateStatus = async (patient, statusType) => {
@@ -178,17 +272,17 @@ const DoctorDashboard = () => {
         ), // Convert medicines to JSON
         mc_issued: mcYes ? 1 : 0, // 1 if MC issued, otherwise 0
       };
-  
+
       // Send PUT request to update the queue entry
       await axios.put(`${API_BASE_URL}/queue/${popupPatient.id}`, consultationData);
-  
+
       alert("Consultation saved successfully!");
       closePopup();
     } catch (error) {
       console.error("Error saving consultation:", error);
       alert("Failed to save consultation. Please try again.");
     }
-  };  
+  };
 
   const fetchDiagnosisSuggestions = async (query) => {
     if (query.length > 0) {
@@ -203,7 +297,7 @@ const DoctorDashboard = () => {
     } else {
       setDiagnosisSuggestions([]); // Clear suggestions if input is empty
     }
-  };  
+  };
 
   const fetchMedicineSuggestions = async (query) => {
     if (query.length > 0) {
@@ -219,7 +313,6 @@ const DoctorDashboard = () => {
       setMedicineSuggestions([]); // Clear suggestions if input is empty
     }
   };
-  
 
   return (
     <div className="content-wrapper" style={{ marginLeft: "0", paddingLeft: "0" }}>
@@ -255,8 +348,26 @@ const DoctorDashboard = () => {
           <div className="row mt-4">
             <div className="col-12">
               <div className="card">
-                <div className="card-header">
-                  <h3 className="card-title" style={{ fontSize: "1.5rem", fontWeight: "bold" }}>Patient List</h3>
+                <div className="card-header d-flex align-items-center justify-content-between">
+                  <h3 className="card-title" style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
+                    Patient List
+                  </h3>
+                  <div>
+                    <button
+                      className="btn btn-primary btn-sm mr-2"
+                      onClick={callNextPatient}
+                      disabled={loadingNext}
+                    >
+                      {loadingNext ? "Calling..." : "Call Next Patient"}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={repeatCall}
+                      disabled={loadingRepeat}
+                    >
+                      {loadingRepeat ? "Repeating..." : "Repeat Call"}
+                    </button>
+                  </div>
                 </div>
                 <div className="card-body table-responsive">
                   <table className="table table-hover">
@@ -268,6 +379,8 @@ const DoctorDashboard = () => {
                         <th>Gender</th>
                         <th>Age</th>
                         <th>Status</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
@@ -281,6 +394,8 @@ const DoctorDashboard = () => {
                             <td>{row.gender}</td>
                             <td>{row.age}</td>
                             <td>{row.status}</td>
+                            <td>{row.timeIn}</td>
+                            <td>{row.timeOut}</td>
                             <td>
                               <button className="btn btn-primary btn-sm mr-2" onClick={() => handleTimeIn(row)}>
                                 Time In
