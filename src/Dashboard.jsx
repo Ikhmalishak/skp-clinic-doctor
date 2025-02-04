@@ -116,17 +116,19 @@ const DoctorDashboard = () => {
 
   const repeatCall = () => {
     if (!currentPatient) {
-      alert("No current patient to repeat the call for.");
-      return;
+        alert("No current patient to repeat the call for.");
+        return;
     }
     setLoadingRepeat(true);
-    // Announce queue number
-    announceQueueNumber(nextPatient.queue_number);
+
+    // Announce queue number again
+    announceQueueNumber(currentPatient.queue_number);
+
     setTimeout(() => {
-      alert(`Repeated call for patient: (Queue No: ${currentPatient.queue_number})`);
-      setLoadingRepeat(false);
+        alert(`Repeated call for patient: (Queue No: ${currentPatient.queue_number})`);
+        setLoadingRepeat(false);
     }, 1000); // Simulate a delay for the repeat call
-  };
+};
 
   const calculateAge = (dob) => {
     const birthDate = new Date(dob);
